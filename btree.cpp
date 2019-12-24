@@ -57,7 +57,7 @@ public:
 
 	// 在以该结点为根的子树中插入一个新值
 	// 在调用这个函数时，结点必须是非满的
-	void insertNonFull(long long int k);
+	void insertNonFull(long long int k, int index);
 
 	// 在子结点已满的时候才可以调用这个方法，它可以把结点一分为二
 	void splitChild(int i, BTreeNode* y);
@@ -72,10 +72,10 @@ public:
 	void DeleteBTreeFromNonLeaf(int idx);
 
 	// 获取结点上第idx位置的前驱
-	long long int getPred(int idx);
+	_keys getPred(int idx);
 
 	// 获取结点上第idx位置的后继
-	long long int getSucc(int idx);
+	_keys getSucc(int idx);
 
 	// 当该结点的值数量小于t-1时，用于填充C[]数组中第idx个位置的子结点
 	void fill(int idx);
@@ -122,7 +122,7 @@ public:
 	}
 
 	// 在B树中插入一个新的值
-	void InsertBTree(long long int k);
+	void InsertBTree(long long int k, int index);
 
 	// 在B树中删除一个值
 	void DeleteBTree(long long int k);
@@ -220,18 +220,18 @@ void BTreeNode::DeleteBTreeFromNonLeaf(int idx) {
 
 	// 如果C[idx]的子树至少有t个值，那么在以C[idx]为根的子树中找到k的一个前驱。用前驱替换k。递归删除C[idx]中的前驱
 	if (C[idx]->n >= t) {
-		long long int pred = getPred(idx);
+		_keys pred = getPred(idx);
 		//keys[idx].indexs = keys[pred].indexs;
-		keys[idx].keys = pred;
-		C[idx]->DeleteBTree(pred);
+		keys[idx] = pred;
+		C[idx]->DeleteBTree(pred.keys);
 	}
 
 	// 如果子结点C[idx]的值的数量比t少，就去看C[idx+1]，如果C[idx+1]有至少t个值，在根为C[idx+1]的子树中找k的后继
 	else if (C[idx + 1]->n >= t) {
-		long long int succ = getSucc(idx);
+		_keys succ = getSucc(idx);
 		//keys[succ].indexs = keys[succ].indexs;
-		keys[idx].keys = succ;
-		C[idx + 1]->DeleteBTree(succ);
+		keys[idx] = succ;
+		C[idx + 1]->DeleteBTree(succ.keys);
 	}
 
 	// 如果C[idx]和C[idx+1]的值比t少，将k和所有的C[idx+1]合并到C[idx]中，现在C[idx]包含2t-1键，C[idx+1]递归地从C[idx]中删除k
@@ -243,18 +243,18 @@ void BTreeNode::DeleteBTreeFromNonLeaf(int idx) {
 }
 
 // 获取索引值的前驱
-long long int BTreeNode::getPred(int idx) {
+_keys BTreeNode::getPred(int idx) {
 	// 一直移动到最右边的结点，直到到达一个叶结点
 	BTreeNode* cur = C[idx];
 	while (!cur->leaf)
 		cur = cur->C[cur->n];
 
 	// 返回叶结点的最后一个值
-	return cur->keys[cur->n - 1].keys;
+	return cur->keys[cur->n - 1];
 }
 
 // 获取索引值的后继
-long long int BTreeNode::getSucc(int idx) {
+_keys BTreeNode::getSucc(int idx) {
 
 	// 从C[idx+1]开始移动最左边的结点，直到到达一个叶结点 
 	BTreeNode* cur = C[idx + 1];
@@ -262,7 +262,7 @@ long long int BTreeNode::getSucc(int idx) {
 		cur = cur->C[0];
 
 	// 返回叶结点的第一个值
-	return cur->keys[0].keys;
+	return cur->keys[0];
 }
 
 // 填充值数量小于t-1的子结点C[idx]
@@ -392,12 +392,13 @@ void BTreeNode::merge(int idx) {
 }
 
 // 在B树中插入一个新值
-void BTree::InsertBTree(long long int k) {
+void BTree::InsertBTree(long long int k, int index) {
 	// 如果树为空
 	if (root == NULL) {
 		// 给根结点分配内存
 		root = new BTreeNode(t, true);
 		root->keys[0].keys = k;  // 插入值
+		root->keys[0].indexs = index;
 		root->n = 1;  // 更新个数
 	}
 	else { // 如果树非空
@@ -416,19 +417,19 @@ void BTree::InsertBTree(long long int k) {
 			int i = 0;
 			if (s->keys[0].keys < k)
 				i++;
-			s->C[i]->insertNonFull(k);
+			s->C[i]->insertNonFull(k, index);
 
 			// 更换根结点为s
 			root = s;
 		}
 		else  
 			// 如果根不是满的，则调用insertNonFull插入新值
-			root->insertNonFull(k);
+			root->insertNonFull(k, index);
 	}
 }
 
 // 在这个非满的结点中插入新值
-void BTreeNode::insertNonFull(long long int k) {
+void BTreeNode::insertNonFull(long long int k, int index) {
 	// 将index初始化为最右边元素的索引
 	int i = n - 1;
 
@@ -443,6 +444,7 @@ void BTreeNode::insertNonFull(long long int k) {
 
 		// 在找到的位置插入新值
 		keys[i + 1].keys = k;
+		keys[i + 1].indexs = index;
 		n = n + 1;
 	}
 	else {
@@ -461,7 +463,7 @@ void BTreeNode::insertNonFull(long long int k) {
 				i++;
 		}
 		// 然后再尝试插入
-		C[i + 1]->insertNonFull(k);
+		C[i + 1]->insertNonFull(k, index);
 	}
 }
 
@@ -511,7 +513,7 @@ void BTreeNode::TraverseBTree() {
 		// 如果这不是叶结点，那么在输出第i个值之前，先进到它的第i个子结点遍历
 		if (leaf == false)
 			C[i]->TraverseBTree();
-		cout << " " << keys[i].keys;
+		cout << keys[i].keys << "|" << keys[i].indexs << endl;
 	}
 
 	// 输出最后一个子树
@@ -578,19 +580,20 @@ int main() {
 	BTree t;
 	t = t.InitBTree(3);
 
-	int num = 0;
+	long long int stuID = 0;
+	int index = 0;
 	int n;
 	cin >> n;
 	for (int i = 1; i <= n; i++) {
-		cin >> num;
-		t.InsertBTree(num);
+		cin >> stuID >> index;
+		t.InsertBTree(stuID, index);
 	}
 
 	cout << "Traversal of tree constructed is\n";
 	t.TraverseBTree();
 	cout << endl;
 
-	t.DeleteBTree(6);
+	t.DeleteBTree(201893010106);
 	cout << "Traversal of tree after removing 6\n";
 	t.TraverseBTree();
 	cout << endl;
